@@ -1,6 +1,8 @@
 use anyhow::Error;
+use bytes::buf::Buf;
 use clap::{Args, Parser, Subcommand};
 use feed_rs::model::Text;
+use reqwest::{header::HeaderValue, ClientBuilder};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -22,12 +24,13 @@ struct AddArgs {
     url: String,
 }
 
-fn main() -> () {
+#[tokio::main]
+async fn main() -> () {
     pretty_env_logger::init();
     let cli = Cli::parse();
 
     match &cli.command {
-        Command::Add(ref args) => add_feed(&cli, args).unwrap(),
+        Command::Add(ref args) => add_feed(&cli, args).await.unwrap(),
     }
 }
 
@@ -39,13 +42,19 @@ fn unknown_text() -> Text {
     }
 }
 
-fn add_feed(_cli: &Cli, args: &AddArgs) -> Result<(), Error> {
+async fn add_feed(_cli: &Cli, args: &AddArgs) -> Result<(), Error> {
     log::info!("fetch {}", args.url);
-    let agent = ureq::AgentBuilder::new().try_proxy_from_env(true).build();
-    let resp = agent.get(&args.url).call()?;
-    log::debug!("Content-Type: {}", resp.content_type());
-    let content = resp.into_reader();
-    let feed = feed_rs::parser::parse(content)?;
+    let agent = ClientBuilder::new().build()?;
+    let resp = agent.get(&args.url).send().await?;
+    log::debug!(
+        "Content-Type: {}",
+        resp.headers()
+            .get("Content-Type")
+            .unwrap_or(&HeaderValue::from_str("none").unwrap())
+            .to_str()?
+    );
+    let content = resp.bytes().await?;
+    let feed = feed_rs::parser::parse(content.reader())?;
     log::debug!(
         "{:?} by {:?}, last updated on {:?} ({})",
         feed.title.unwrap_or_else(|| unknown_text()).content,
