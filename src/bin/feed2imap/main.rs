@@ -1,6 +1,8 @@
 use anyhow::Error;
 use bytes::buf::Buf;
 use clap::{Args, Parser, Subcommand};
+use feed2imap::store;
+use feed2imap::store::Utc;
 use feed_rs::model::Text;
 use reqwest::{header::HeaderValue, ClientBuilder};
 
@@ -55,13 +57,29 @@ async fn add_feed(_cli: &Cli, args: &AddArgs) -> Result<(), Error> {
     );
     let content = resp.bytes().await?;
     let feed = feed_rs::parser::parse(content.reader())?;
+
+    let store = store::Store::new(&std::env::var("DATABASE_URL")?).await?;
+    let title = feed.title.clone().unwrap_or_else(|| unknown_text()).content;
+    let updated = feed.updated.unwrap_or(Utc::now());
+    let checked = Utc::now();
+
     log::debug!(
         "{:?} by {:?}, last updated on {:?} ({})",
-        feed.title.unwrap_or_else(|| unknown_text()).content,
+        title,
         feed.authors,
-        feed.updated,
+        updated,
         feed.id,
     );
+
+    store
+        .add_feed(feed2imap::store::Feed {
+            id: feed.id,
+            title: title,
+            last_updated: updated,
+            last_checked: checked,
+        })
+        .await?;
+
     for entry in feed.entries {
         log::debug!(
             "- {} ({})",

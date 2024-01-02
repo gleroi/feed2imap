@@ -2,8 +2,8 @@
 CREATE TABLE feeds(
     id TEXT PRIMARY KEY,
     title TEXT,
-    last_updated INTEGER,
-    last_checked INTEGER
+    last_updated DATETIME,
+    last_checked DATETIME
 );
 
 CREATE TABLE feed_entries(
