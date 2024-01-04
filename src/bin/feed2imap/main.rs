@@ -7,6 +7,10 @@ use feed_rs::model::Text;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
+    /// database connection string "sqlite:path"
+    #[arg(long, env = "DATABASE_URL")]
+    database_url: String,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -16,6 +20,10 @@ enum Command {
     /// add a feed
     #[command()]
     Add(AddArgs),
+
+    /// list feeds
+    #[command()]
+    List,
 }
 
 #[derive(Args)]
@@ -31,6 +39,7 @@ async fn main() -> () {
 
     match &cli.command {
         Command::Add(ref args) => add_feed(&cli, args).await.unwrap(),
+        Command::List => list_feeds(&cli).await.unwrap(),
     }
 }
 
@@ -42,14 +51,14 @@ fn unknown_text() -> Text {
     }
 }
 
-async fn add_feed(_cli: &Cli, args: &AddArgs) -> Result<(), Error> {
+async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
     log::info!("fetch {}", args.url);
 
     let feed = fetch::url(&args.url).await?;
-    let store = store::Store::new(&std::env::var("DATABASE_URL")?).await?;
+    let store = store::Store::new(&cli.database_url).await?;
     let title = feed.title.clone().unwrap_or_else(|| unknown_text()).content;
-    let updated = feed.updated.unwrap_or(Utc::now());
-    let checked = DateTime::<Utc>::default();
+    let updated = feed.updated.unwrap_or(Utc::now()).naive_utc();
+    let checked = DateTime::default();
 
     let mut entries = Vec::with_capacity(feed.entries.len());
     for entry in feed.entries {
@@ -81,5 +90,18 @@ async fn add_feed(_cli: &Cli, args: &AddArgs) -> Result<(), Error> {
         )
         .await?;
 
+    Ok(())
+}
+
+async fn list_feeds(cli: &Cli) -> Result<(), Error> {
+    let store = store::Store::new(&cli.database_url).await?;
+    let feeds = store.list_feeds().await?;
+    for feed in feeds {
+        println!("Title: {}", feed.title);
+        println!("Url: {}", feed.url);
+        println!("Updated: {}", feed.last_updated);
+        println!("Checked: {}", feed.last_checked);
+        println!()
+    }
     Ok(())
 }

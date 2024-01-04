@@ -1,7 +1,7 @@
 use anyhow::Error;
 use sqlx::sqlite::SqlitePool;
 
-pub use sqlx::types::chrono::{DateTime, Utc};
+pub use sqlx::types::chrono::{NaiveDateTime as DateTime, Utc};
 
 pub struct Store {
     pool: SqlitePool,
@@ -12,8 +12,8 @@ pub struct Feed {
     pub id: String,
     pub title: String,
     pub url: String,
-    pub last_updated: DateTime<Utc>,
-    pub last_checked: DateTime<Utc>,
+    pub last_updated: DateTime,
+    pub last_checked: DateTime,
 }
 
 #[derive(sqlx::FromRow)]
@@ -33,6 +33,18 @@ impl Store {
         Ok(Store {
             pool: SqlitePool::connect(connection_string).await?,
         })
+    }
+
+    pub async fn list_feeds(&self) -> Result<Vec<Feed>, Error> {
+        let feeds = sqlx::query_as!(
+            Feed,
+            r#"
+                select * from feeds
+            "#
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(feeds)
     }
 
     pub async fn store_feed(&self, feed: &Feed, entries: &Vec<Entry>) -> Result<(), Error> {
