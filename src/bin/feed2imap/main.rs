@@ -1,10 +1,8 @@
 use anyhow::Error;
-use bytes::buf::Buf;
 use clap::{Args, Parser, Subcommand};
-use feed2imap::store;
-use feed2imap::store::Utc;
+use feed2imap::store::{DateTime, Entry, Utc};
+use feed2imap::{fetch, store};
 use feed_rs::model::Text;
-use reqwest::{header::HeaderValue, ClientBuilder};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -46,46 +44,42 @@ fn unknown_text() -> Text {
 
 async fn add_feed(_cli: &Cli, args: &AddArgs) -> Result<(), Error> {
     log::info!("fetch {}", args.url);
-    let agent = ClientBuilder::new().build()?;
-    let resp = agent.get(&args.url).send().await?;
-    log::debug!(
-        "Content-Type: {}",
-        resp.headers()
-            .get("Content-Type")
-            .unwrap_or(&HeaderValue::from_str("none").unwrap())
-            .to_str()?
-    );
-    let content = resp.bytes().await?;
-    let feed = feed_rs::parser::parse(content.reader())?;
 
+    let feed = fetch::url(&args.url).await?;
     let store = store::Store::new(&std::env::var("DATABASE_URL")?).await?;
     let title = feed.title.clone().unwrap_or_else(|| unknown_text()).content;
     let updated = feed.updated.unwrap_or(Utc::now());
-    let checked = Utc::now();
+    let checked = DateTime::<Utc>::default();
+
+    let mut entries = Vec::with_capacity(feed.entries.len());
+    for entry in feed.entries {
+        entries.push(Entry {
+            id: entry.id.clone(),
+            feed_id: feed.id.clone(),
+        });
+    }
 
     log::debug!(
-        "{:?} by {:?}, last updated on {:?} ({})",
+        "{:?} by {:?}, last updated on {:?} ({}) with {} entries",
         title,
         feed.authors,
         updated,
         feed.id,
+        entries.len(),
     );
 
     store
-        .add_feed(feed2imap::store::Feed {
-            id: feed.id,
-            title: title,
-            last_updated: updated,
-            last_checked: checked,
-        })
+        .store_feed(
+            &feed2imap::store::Feed {
+                id: feed.id.clone(),
+                title: title,
+                url: args.url.clone(),
+                last_updated: updated,
+                last_checked: checked,
+            },
+            &entries,
+        )
         .await?;
 
-    for entry in feed.entries {
-        log::debug!(
-            "- {} ({})",
-            entry.title.unwrap_or_else(|| unknown_text()).content,
-            entry.id
-        );
-    }
     Ok(())
 }
