@@ -35,7 +35,8 @@ impl Store {
         })
     }
 
-    pub async fn list_feeds(&self) -> Result<Vec<Feed>, Error> {
+    /// retrieve all feeds.
+    pub async fn feeds(&self) -> Result<Vec<Feed>, Error> {
         let feeds = sqlx::query_as!(
             Feed,
             r#"
@@ -47,6 +48,8 @@ impl Store {
         Ok(feeds)
     }
 
+    /// store a feed and its entries.
+    /// if the feed alread exist update it.
     pub async fn store_feed(&self, feed: &Feed, entries: &Vec<Entry>) -> Result<(), Error> {
         let id = sqlx::query!(
             r#"

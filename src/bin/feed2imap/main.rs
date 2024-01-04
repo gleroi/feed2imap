@@ -2,7 +2,9 @@ use anyhow::Error;
 use clap::{Args, Parser, Subcommand};
 use feed2imap::store::{DateTime, Entry, Utc};
 use feed2imap::{fetch, store};
-use feed_rs::model::Text;
+use feed_rs::model::{Content, Text};
+use mail_builder::headers::address::Address;
+use mail_builder::MessageBuilder;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -24,6 +26,10 @@ enum Command {
     /// list feeds
     #[command()]
     List,
+
+    /// fetch feeds and send new entries by mail
+    #[command()]
+    Sync,
 }
 
 #[derive(Args)]
@@ -40,7 +46,45 @@ async fn main() -> () {
     match &cli.command {
         Command::Add(ref args) => add_feed(&cli, args).await.unwrap(),
         Command::List => list_feeds(&cli).await.unwrap(),
+        Command::Sync => sync_feeds(&cli).await.unwrap(),
     }
+}
+
+async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
+    let store = store::Store::new(&cli.database_url).await?;
+    let feeds = store.feeds().await?;
+
+    for feed in feeds {
+        log::info!("syncing {}", feed.title);
+        let full_feed = fetch::url(&feed.url).await?;
+        for entry in full_feed.entries {
+            println!("{:#?}", entry);
+            let mail = MessageBuilder::new()
+                .from(Address::new_address(
+                    feed.title.into(),
+                    "placeholder@example.org",
+                ))
+                .to(Address::new_address(
+                    "Guillaume Leroi".into(),
+                    "guillaume@leroi.re",
+                ))
+                .subject(&entry.title.unwrap_or(unknown_text()).content)
+                .html_body(
+                    &entry
+                        .content
+                        .unwrap_or(unknown_content())
+                        .body
+                        .unwrap_or("unknown content".to_owned())
+                        .chars()
+                        .take(50)
+                        .collect::<String>(),
+                )
+                .write_to(std::io::stdout())?;
+            break; // TODO: remove it
+        }
+    }
+
+    Ok(())
 }
 
 fn unknown_text() -> Text {
@@ -51,11 +95,19 @@ fn unknown_text() -> Text {
     }
 }
 
+fn unknown_content() -> Content {
+    Content {
+        content_type: mime::TEXT_PLAIN,
+        body: "unknown content".to_owned().into(),
+        length: None,
+        src: None,
+    }
+}
+
 async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
     log::info!("fetch {}", args.url);
 
     let feed = fetch::url(&args.url).await?;
-    let store = store::Store::new(&cli.database_url).await?;
     let title = feed.title.clone().unwrap_or_else(|| unknown_text()).content;
     let updated = feed.updated.unwrap_or(Utc::now()).naive_utc();
     let checked = DateTime::default();
@@ -77,6 +129,7 @@ async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
         entries.len(),
     );
 
+    let store = store::Store::new(&cli.database_url).await?;
     store
         .store_feed(
             &feed2imap::store::Feed {
@@ -95,7 +148,7 @@ async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
 
 async fn list_feeds(cli: &Cli) -> Result<(), Error> {
     let store = store::Store::new(&cli.database_url).await?;
-    let feeds = store.list_feeds().await?;
+    let feeds = store.feeds().await?;
     for feed in feeds {
         println!("Title: {}", feed.title);
         println!("Url: {}", feed.url);
