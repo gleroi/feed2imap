@@ -1,7 +1,7 @@
 use anyhow::Error;
 use clap::{Args, Parser, Subcommand};
 use feed2imap::store::{DateTime, Entry, Utc};
-use feed2imap::{fetch, store};
+use feed2imap::{fetch, store, transform};
 use feed_rs::model::{Content, Text};
 use mail_builder::headers::address::Address;
 use mail_builder::MessageBuilder;
@@ -58,27 +58,19 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
         log::info!("syncing {}", feed.title);
         let full_feed = fetch::url(&feed.url).await?;
         for entry in full_feed.entries {
-            println!("{:#?}", entry);
+            // println!("{:#?}", entry);
             let mail = MessageBuilder::new()
                 .from(Address::new_address(
                     feed.title.into(),
-                    "placeholder@example.org",
+                    transform::extract_email(&feed)?,
                 ))
                 .to(Address::new_address(
                     "Guillaume Leroi".into(),
                     "guillaume@leroi.re",
                 ))
                 .subject(&entry.title.unwrap_or(unknown_text()).content)
-                .html_body(
-                    &entry
-                        .content
-                        .unwrap_or(unknown_content())
-                        .body
-                        .unwrap_or("unknown content".to_owned())
-                        .chars()
-                        .take(50)
-                        .collect::<String>(),
-                )
+                .body(transform::extract_content(&entry)?)
+                .html_body()
                 .write_to(std::io::stdout())?;
             break; // TODO: remove it
         }
@@ -91,15 +83,6 @@ fn unknown_text() -> Text {
     Text {
         content_type: mime::TEXT_PLAIN,
         content: "Unknown".to_owned(),
-        src: None,
-    }
-}
-
-fn unknown_content() -> Content {
-    Content {
-        content_type: mime::TEXT_PLAIN,
-        body: "unknown content".to_owned().into(),
-        length: None,
         src: None,
     }
 }
