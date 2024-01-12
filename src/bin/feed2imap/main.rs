@@ -2,9 +2,8 @@ use anyhow::Error;
 use clap::{Args, Parser, Subcommand};
 use feed2imap::store::{DateTime, Entry, Utc};
 use feed2imap::{fetch, store, transform};
-use feed_rs::model::{Content, Text};
-use mail_builder::headers::address::Address;
-use mail_builder::MessageBuilder;
+use feed_rs::model::Text;
+use std::io::Write;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -54,24 +53,17 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     let store = store::Store::new(&cli.database_url).await?;
     let feeds = store.feeds().await?;
 
-    for feed in feeds {
+    for feed in &feeds {
         log::info!("syncing {}", feed.title);
         let full_feed = fetch::url(&feed.url).await?;
-        for entry in full_feed.entries {
+        for entry in &full_feed.entries {
             // println!("{:#?}", entry);
-            let mail = MessageBuilder::new()
-                .from(Address::new_address(
-                    feed.title.into(),
-                    transform::extract_email(&feed)?,
-                ))
-                .to(Address::new_address(
-                    "Guillaume Leroi".into(),
-                    "guillaume@leroi.re",
-                ))
-                .subject(&entry.title.unwrap_or(unknown_text()).content)
-                .body(transform::extract_content(&entry)?)
-                .html_body()
-                .write_to(std::io::stdout())?;
+            let mut file = std::fs::File::create(format!(
+                "{}.eml",
+                transform::extract_message_id(&full_feed, entry)
+            ))?;
+            let mail = transform::extract_message(&full_feed, entry)?;
+            file.write_all(&mail)?;
             break; // TODO: remove it
         }
     }
