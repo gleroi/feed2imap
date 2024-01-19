@@ -1,7 +1,7 @@
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display};
 
 use anyhow::Error;
-use feed_rs::model::{Content, Text};
+use feed_rs::model::{Text};
 use mail_builder::{headers::address::Address, mime::MimePart, MessageBuilder};
 
 pub fn extract_message(
@@ -36,7 +36,7 @@ pub fn extract_message_id(feed: &feed_rs::model::Feed, entry: &feed_rs::model::E
     return format!("{}", hash);
 }
 
-pub fn extract_email(feed: &feed_rs::model::Feed) -> Result<String, Error> {
+pub fn extract_email(_feed: &feed_rs::model::Feed) -> Result<String, Error> {
     return Ok("placeholder@example.org".to_string());
 }
 
