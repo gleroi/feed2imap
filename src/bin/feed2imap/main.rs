@@ -1,7 +1,7 @@
 use anyhow::Error;
 use clap::{Args, Parser, Subcommand};
 use feed2imap::store::{DateTime, Entry, Utc};
-use feed2imap::{fetch, store, transform};
+use feed2imap::{fetch, imap, store, transform};
 use feed_rs::model::Text;
 use std::io::Write;
 
@@ -11,6 +11,9 @@ struct Cli {
     /// database connection string "sqlite:path"
     #[arg(long, env = "DATABASE_URL")]
     database_url: String,
+
+    #[arg(long, env = "IMAP_PASSWORD")]
+    password: String,
 
     #[command(subcommand)]
     command: Command,
@@ -52,6 +55,7 @@ async fn main() -> () {
 async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     let store = store::Store::new(&cli.database_url).await?;
     let feeds = store.feeds().await?;
+    let mut imap_client = imap::client("guillaume@leroi.re", &cli.password).await?;
 
     for feed in &feeds {
         log::info!("syncing {}", feed.title);
@@ -63,11 +67,13 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
                 transform::extract_message_id(&full_feed, entry)
             ))?;
             let mail = transform::extract_message(&full_feed, entry)?;
+            imap_client.append(&mail, "feeds").await?;
             file.write_all(&mail)?;
             break; // TODO: remove it
         }
     }
 
+    imap_client.logout().await?;
     Ok(())
 }
 
