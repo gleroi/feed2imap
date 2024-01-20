@@ -57,22 +57,24 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     let feeds = store.feeds().await?;
     let mut imap_client = imap::client("guillaume@leroi.re", &cli.password).await?;
 
-    for feed in &feeds {
-        log::info!("syncing {}", feed.title);
-        let full_feed = fetch::url(&feed.url).await?;
-        for entry in &full_feed.entries {
-            // println!("{:#?}", entry);
-            let mut file = std::fs::File::create(format!(
-                "{}.eml",
-                transform::extract_message_id(&full_feed, entry)
-            ))?;
-            let mail = transform::extract_message(&full_feed, entry)?;
-            imap_client.append(&mail, "feeds").await?;
-            file.write_all(&mail)?;
-            break; // TODO: remove it
-        }
-    }
+    // for feed in &feeds {
+    //     log::info!("syncing {}", feed.title);
+    //     let full_feed = fetch::url(&feed.url).await?;
+    //     for entry in &full_feed.entries {
+    //         // println!("{:#?}", entry);
+    //         let mut file = std::fs::File::create(format!(
+    //             "{}.eml",
+    //             transform::extract_message_id(&full_feed, entry)
+    //         ))?;
+    //         let mail = transform::extract_message(&full_feed, entry)?;
+    //         imap_client.append(&mail, "feeds").await?;
+    //         file.write_all(&mail)?;
+    //         break; // TODO: remove it
+    //     }
+    // }
 
+    let ids = imap_client.list_message_ids("feeds").await?;
+    log::debug!("{:#?}", ids);
     imap_client.logout().await?;
     Ok(())
 }

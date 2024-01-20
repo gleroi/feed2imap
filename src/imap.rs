@@ -1,5 +1,8 @@
-use anyhow::Error;
+use anyhow::{anyhow, Error};
+use async_imap::types::Fetch;
 use async_native_tls::TlsStream;
+use futures::StreamExt;
+use mail_parser;
 use tokio::net::TcpStream;
 
 pub struct Client {
@@ -26,5 +29,34 @@ impl Client {
     pub async fn logout(&mut self) -> Result<(), Error> {
         let _result = self.imap.logout().await?;
         Ok(())
+    }
+
+    pub async fn list_message_ids(&mut self, folder: &str) -> Result<Vec<String>, Error> {
+        let mailbox = self.imap.examine(folder).await?;
+        log::debug!("there is {} in {} mailbox", mailbox.exists, folder);
+
+        let stream = self
+            .imap
+            .fetch("1:*", "(FLAGS BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+            .await?;
+        let fetches: Result<Vec<Fetch>, _> = stream.collect::<Vec<_>>().await.into_iter().collect();
+        let parser = mail_parser::MessageParser::default();
+        let ids = fetches?
+            .iter()
+            .filter_map(|fetch| fetch.header())
+            .filter_map(|header| parser.parse_headers(header))
+            .filter_map(|msg| {
+                if let Some(header) = msg.header("MESSAGE-ID") {
+                    if let Some(id) = header.clone().into_text() {
+                        Some(id.into_owned())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+        Ok(ids)
     }
 }
