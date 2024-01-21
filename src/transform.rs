@@ -1,8 +1,13 @@
-use std::{fmt::Display};
+use std::fmt::Display;
 
 use anyhow::Error;
-use feed_rs::model::{Text};
-use mail_builder::{headers::address::Address, mime::MimePart, MessageBuilder};
+use chrono::{DateTime, Utc};
+use feed_rs::model::Text;
+use mail_builder::{
+    headers::{address::Address, date::Date},
+    mime::MimePart,
+    MessageBuilder,
+};
 
 pub fn extract_message(
     full_feed: &feed_rs::model::Feed,
@@ -23,9 +28,18 @@ pub fn extract_message(
             "Guillaume Leroi".into(),
             "guillaume@leroi.re",
         ))
+        .date(extract_published_data(entry))
         .subject(extract_title(entry))
         .body(extract_content(entry)?)
         .write_to_vec()?)
+}
+
+fn extract_published_data(entry: &feed_rs::model::Entry) -> impl Into<Date> {
+    entry
+        .updated
+        .or_else(|| entry.published)
+        .unwrap_or_else(|| Utc::now())
+        .timestamp()
 }
 
 pub fn extract_message_id(feed: &feed_rs::model::Feed, entry: &feed_rs::model::Entry) -> String {

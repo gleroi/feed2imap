@@ -3,7 +3,6 @@ use clap::{Args, Parser, Subcommand};
 use feed2imap::store::{DateTime, Entry, Utc};
 use feed2imap::{fetch, imap, store, transform};
 use feed_rs::model::Text;
-use std::io::Write;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -55,26 +54,27 @@ async fn main() -> () {
 async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     let store = store::Store::new(&cli.database_url).await?;
     let feeds = store.feeds().await?;
+    log::debug!("connecting to mail server");
     let mut imap_client = imap::client("guillaume@leroi.re", &cli.password).await?;
-
-    // for feed in &feeds {
-    //     log::info!("syncing {}", feed.title);
-    //     let full_feed = fetch::url(&feed.url).await?;
-    //     for entry in &full_feed.entries {
-    //         // println!("{:#?}", entry);
-    //         let mut file = std::fs::File::create(format!(
-    //             "{}.eml",
-    //             transform::extract_message_id(&full_feed, entry)
-    //         ))?;
-    //         let mail = transform::extract_message(&full_feed, entry)?;
-    //         imap_client.append(&mail, "feeds").await?;
-    //         file.write_all(&mail)?;
-    //         break; // TODO: remove it
-    //     }
-    // }
-
+    log::debug!("get email ids");
     let ids = imap_client.list_message_ids("feeds").await?;
-    log::debug!("{:#?}", ids);
+    log::debug!("{} emails found", ids.len());
+
+    for feed in &feeds {
+        log::info!("syncing {}", feed.title);
+        let full_feed = fetch::url(&feed.url).await?;
+        for entry in &full_feed.entries {
+            let id = transform::extract_message_id(&full_feed, &entry);
+            if !ids.contains(&id) {
+                let mail = transform::extract_message(&full_feed, entry)?;
+                imap_client.append(&mail, "feeds").await?;
+                log::debug!("{} appended to mail", id);
+            } else {
+                log::debug!("{} already in mail", id);
+            }
+        }
+    }
+
     imap_client.logout().await?;
     Ok(())
 }

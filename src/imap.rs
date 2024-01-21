@@ -1,8 +1,9 @@
-use anyhow::{anyhow, Error};
+use anyhow::Error;
 use async_imap::types::Fetch;
 use async_native_tls::TlsStream;
 use futures::StreamExt;
 use mail_parser;
+use std::collections::BTreeSet;
 use tokio::net::TcpStream;
 
 pub struct Client {
@@ -22,6 +23,7 @@ pub async fn client(username: &str, password: &str) -> Result<Client, Error> {
 
 impl Client {
     pub async fn append(&mut self, mail: &Vec<u8>, folder: &str) -> Result<(), Error> {
+        let _result = self.imap.select(folder).await?;
         let _result = self.imap.append(folder, mail).await?;
         Ok(())
     }
@@ -31,7 +33,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn list_message_ids(&mut self, folder: &str) -> Result<Vec<String>, Error> {
+    pub async fn list_message_ids(&mut self, folder: &str) -> Result<BTreeSet<String>, Error> {
         let mailbox = self.imap.examine(folder).await?;
         log::debug!("there is {} in {} mailbox", mailbox.exists, folder);
 
