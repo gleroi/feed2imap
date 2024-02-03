@@ -23,8 +23,10 @@ The format for configuration is TOML, and must ressemble this:
 [imap]
 host = "mail.example.com"
 port = 993
-username = "test@example.com"
+username = "test"
 password = "azerty123"
+name = "John Smith"
+email = "test@example.com"
 
 [[feeds]]
 url = "http://example.org/rss"

@@ -1,7 +1,6 @@
 use anyhow::Error;
 use clap::{Args, Parser, Subcommand};
 use feed2imap::{fetch, imap, transform};
-use feed_rs::model::Text;
 
 pub mod config;
 
@@ -72,7 +71,12 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
         for entry in &full_feed.entries {
             let id = transform::extract_message_id(&full_feed, &entry);
             if !ids.contains(&id) {
-                let mail = transform::extract_message(&full_feed, entry)?;
+                let mail = transform::extract_message(
+                    &config.imap.name,
+                    &config.imap.email,
+                    &full_feed,
+                    entry,
+                )?;
                 imap_client.append(&mail, "feeds").await?;
                 log::debug!("{} appended to mail", id);
             } else {

@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use anyhow::Error;
 use chrono::Utc;
 use feed_rs::model::Text;
@@ -8,8 +6,11 @@ use mail_builder::{
     mime::MimePart,
     MessageBuilder,
 };
+use std::fmt::Display;
 
 pub fn extract_message(
+    name: &str,
+    email: &str,
     full_feed: &feed_rs::model::Feed,
     entry: &feed_rs::model::Entry,
 ) -> Result<Vec<u8>, Error> {
@@ -19,10 +20,7 @@ pub fn extract_message(
             extract_feed_title(full_feed)?.into(),
             extract_email(full_feed)?,
         ))
-        .to(Address::new_address(
-            "Guillaume Leroi".into(),
-            "guillaume@leroi.re",
-        ))
+        .to(Address::new_address(name.into(), email))
         .date(extract_published_date(entry))
         .subject(extract_title(entry))
         .body(extract_content(entry)?)
