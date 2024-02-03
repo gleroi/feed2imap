@@ -19,8 +19,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// add a feed
-    // #[command()]
-    // Add(AddArgs),
+    #[command()]
+    Add(AddArgs),
 
     /// print a default configuration
     #[command()]
@@ -47,7 +47,7 @@ async fn main() -> () {
     let cli = Cli::parse();
 
     match &cli.command {
-        // Command::Add(ref args) => add_feed(&cli, args).await.unwrap(),
+        Command::Add(ref args) => add_feed(&cli, args).await.unwrap(),
         Command::Config => config(&cli).await.unwrap(),
         Command::List => list_feeds(&cli).await.unwrap(),
         Command::Sync => sync_feeds(&cli).await.unwrap(),
@@ -85,55 +85,20 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     Ok(())
 }
 
-fn unknown_text() -> Text {
-    Text {
-        content_type: mime::TEXT_PLAIN,
-        content: "Unknown".to_owned(),
-        src: None,
-    }
+async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
+    let mut config = config::load(&cli.config)?;
+
+    log::info!("fetch {}", args.url);
+
+    let _feed = fetch::url(&args.url).await?;
+
+    config.feeds.push(config::Feed {
+        url: args.url.to_owned(),
+    });
+    config::save(&config, &cli.config)?;
+
+    Ok(())
 }
-
-// async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
-//     log::info!("fetch {}", args.url);
-
-//     let feed = fetch::url(&args.url).await?;
-//     let title = feed.title.clone().unwrap_or_else(|| unknown_text()).content;
-//     let updated = feed.updated.unwrap_or(Utc::now()).naive_utc();
-//     let checked = DateTime::default();
-
-//     let mut entries = Vec::with_capacity(feed.entries.len());
-//     for entry in feed.entries {
-//         entries.push(Entry {
-//             id: entry.id.clone(),
-//             feed_id: feed.id.clone(),
-//         });
-//     }
-
-//     log::debug!(
-//         "{:?} by {:?}, last updated on {:?} ({}) with {} entries",
-//         title,
-//         feed.authors,
-//         updated,
-//         feed.id,
-//         entries.len(),
-//     );
-
-//     let store = store::Store::new(&cli.database_url).await?;
-//     store
-//         .store_feed(
-//             &feed2imap::store::Feed {
-//                 id: feed.id.clone(),
-//                 title: title,
-//                 url: args.url.clone(),
-//                 last_updated: updated,
-//                 last_checked: checked,
-//             },
-//             &entries,
-//         )
-//         .await?;
-
-//     Ok(())
-// }
 
 async fn list_feeds(cli: &Cli) -> Result<(), Error> {
     let config = config::load(&cli.config)?;

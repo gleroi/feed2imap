@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Error;
-use chrono::{DateTime, Utc};
+use chrono::{Utc};
 use feed_rs::model::Text;
 use mail_builder::{
     headers::{address::Address, date::Date},

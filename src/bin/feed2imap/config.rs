@@ -1,4 +1,8 @@
-use std::{fs::File, io::Read, path::Path};
+use std::{
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+};
 
 use anyhow::Error;
 use serde::{Deserialize, Serialize};
@@ -34,5 +38,12 @@ pub fn dump_default() -> Result<(), Error> {
     let config = Config::default();
     let str = toml::to_string_pretty(&config)?;
     println!("{}", str);
+    Ok(())
+}
+
+pub fn save<P: AsRef<Path>>(config: &Config, path: P) -> Result<(), Error> {
+    let str = toml::to_string_pretty(config)?;
+    let mut file = File::create(path)?;
+    file.write_all(str.as_bytes())?;
     Ok(())
 }
