@@ -8,9 +8,9 @@ feeds from a mail client compatible with IMAP.
 feed2imap is a rust crate, build it using:
 
 ```bash
-  cargo build
-  # or
-  cargo install
+cargo build
+# or
+cargo install
 ```
 
 ## configuration
