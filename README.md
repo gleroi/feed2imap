@@ -21,11 +21,14 @@ by passing it by a command line option `--option`.
 The format for configuration is TOML, and must ressemble this:
 ```toml
 [imap]
-host = "plop"
+host = "mail.example.com"
+port = 993
+username = "test@example.com"
+password = "azerty123"
 
 [[feeds]]
 url = "http://example.org/rss"
 
 [[feeds]]
-url = "http://example.org/atom"
+url = "http://another.org/atom"
 ```
