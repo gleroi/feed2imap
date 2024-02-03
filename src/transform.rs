@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use anyhow::Error;
-use chrono::{Utc};
+use chrono::Utc;
 use feed_rs::model::Text;
 use mail_builder::{
     headers::{address::Address, date::Date},
@@ -16,25 +16,20 @@ pub fn extract_message(
     Ok(MessageBuilder::new()
         .message_id(extract_message_id(full_feed, entry))
         .from(Address::new_address(
-            full_feed
-                .title
-                .clone()
-                .unwrap_or(unknown_text())
-                .content
-                .into(),
+            extract_feed_title(full_feed)?.into(),
             extract_email(full_feed)?,
         ))
         .to(Address::new_address(
             "Guillaume Leroi".into(),
             "guillaume@leroi.re",
         ))
-        .date(extract_published_data(entry))
+        .date(extract_published_date(entry))
         .subject(extract_title(entry))
         .body(extract_content(entry)?)
         .write_to_vec()?)
 }
 
-fn extract_published_data(entry: &feed_rs::model::Entry) -> impl Into<Date> {
+fn extract_published_date(entry: &feed_rs::model::Entry) -> impl Into<Date> {
     entry
         .updated
         .or_else(|| entry.published)
@@ -50,8 +45,16 @@ pub fn extract_message_id(feed: &feed_rs::model::Feed, entry: &feed_rs::model::E
     return format!("{}", hash);
 }
 
-pub fn extract_email(_feed: &feed_rs::model::Feed) -> Result<String, Error> {
-    return Ok("placeholder@example.org".to_string());
+fn extract_feed_title(full_feed: &feed_rs::model::Feed) -> Result<String, Error> {
+    Ok(full_feed.title.clone().unwrap_or(unknown_text()).content)
+}
+
+pub fn extract_email(feed: &feed_rs::model::Feed) -> Result<String, Error> {
+    if let Some(ref author) = feed.authors.iter().find(|author| author.email.is_some()) {
+        Ok(author.email.as_ref().unwrap().to_owned())
+    } else {
+        Ok("placeholder@example.org".to_string())
+    }
 }
 
 pub fn extract_title(entry: &feed_rs::model::Entry) -> String {
