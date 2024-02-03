@@ -3,4 +3,29 @@
 Load RSS/ATOM feeds and store them in a IMAP mailbox, allowing one to read its
 feeds from a mail client compatible with IMAP.
 
+## build
 
+feed2imap is a rust crate, build it using:
+
+```
+  cargo build
+  # or
+  cargo install
+```
+
+## configuration
+
+feed2imap expects to find a configuration file at `~/.config/feed2imap.toml`, or
+by passing it by a command line option `--option`. 
+
+The format for configuration is TOML, and must ressemble this:
+```toml
+[imap]
+host = "plop"
+
+[[feeds]]
+url = "http://example.org/rss"
+
+[[feeds]]
+url = "http://example.org/atom"
+```
