@@ -8,6 +8,8 @@ use mail_builder::{
 };
 use std::fmt::Display;
 
+mod html;
+
 pub fn extract_message(
     name: &str,
     email: &str,
@@ -60,7 +62,11 @@ pub fn extract_title(entry: &feed_rs::model::Entry) -> String {
 }
 
 pub fn extract_content(entry: &feed_rs::model::Entry) -> Result<MimePart, Error> {
-    let content = extract_atom_content(entry).or_else(|_| extract_rss_summary(entry))?;
+    let mut content = extract_atom_content(entry).or_else(|_| extract_rss_summary(entry))?;
+    if let Some(ref base_url) = entry.base {
+        content = html::rewrite_relative_src(base_url, content)?;
+    }
+    log::info!("{:#?}", content);
     return Ok(MimePart::new("text/html", content));
 }
 
