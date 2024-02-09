@@ -6,7 +6,7 @@ use mail_builder::{
     mime::MimePart,
     MessageBuilder,
 };
-use std::fmt::Display;
+use std::{fmt::Display, io::Write};
 
 mod html;
 
@@ -66,7 +66,40 @@ pub fn extract_content(entry: &feed_rs::model::Entry) -> Result<MimePart, Error>
     if let Some(ref base_url) = entry.base {
         content = html::rewrite_relative_link(base_url, content)?;
     }
+    content = wrap_content(content);
+    // {
+    //     let mut hasher = blake3::Hasher::new();
+    //     hasher.update(&entry.id.as_bytes());
+    //     let hash = hasher.finalize();
+    //     let filename = format!("html/{}.html", hash);
+    //     log::debug!("saving html of '{}' to {}", entry.id, filename);
+    //     let mut debug = File::create(filename)?;
+    //     debug.write_all(content.as_bytes())?;
+    // }
     return Ok(MimePart::new("text/html", content));
+}
+
+fn wrap_content(content: String) -> String {
+    let style = include_str!("../assets/message.css");
+    format!(
+        r#"
+        <html>
+            <head>
+                <meta http-equiv="Content-Type" content="text/html">
+                <style>
+                    {}
+                </style>
+            </head>
+    
+            <body>
+                <div id="entry">
+                    {}
+                </div>
+            </body>
+        </html>
+        "#,
+        style, content
+    )
 }
 
 fn extract_atom_content(entry: &feed_rs::model::Entry) -> Result<String, Error> {

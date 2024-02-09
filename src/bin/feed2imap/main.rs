@@ -1,6 +1,9 @@
+use std::collections::BTreeSet;
+
 use anyhow::Error;
 use clap::{Args, Parser, Subcommand};
 use feed2imap::{fetch, imap, transform};
+use futures::future::join_all;
 
 pub mod config;
 
@@ -85,7 +88,6 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
         }
     }
 
-    imap_client.logout().await?;
     Ok(())
 }
 
