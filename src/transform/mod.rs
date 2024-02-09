@@ -64,9 +64,8 @@ pub fn extract_title(entry: &feed_rs::model::Entry) -> String {
 pub fn extract_content(entry: &feed_rs::model::Entry) -> Result<MimePart, Error> {
     let mut content = extract_atom_content(entry).or_else(|_| extract_rss_summary(entry))?;
     if let Some(ref base_url) = entry.base {
-        content = html::rewrite_relative_src(base_url, content)?;
+        content = html::rewrite_relative_link(base_url, content)?;
     }
-    log::info!("{:#?}", content);
     return Ok(MimePart::new("text/html", content));
 }
 
