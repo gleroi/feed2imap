@@ -1,0 +1,17 @@
+img {
+    max-width: 100% !important;
+    height: auto;
+}
+
+body,
+#body {
+    font-size: 12pt;
+    word-wrap: break-word;
+    -webkit-nbsp-mode: space;
+    -webkit-line-break: after-white-space;
+    font-family: sans-serif;
+}
+
+a:link {
+    color: #0000cc
+}
