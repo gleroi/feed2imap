@@ -1,0 +1,12 @@
+image: archlinux
+packages:
+  - rust
+sources:
+  - https://git.sr.ht/~gleroi/feed2imap
+tasks:
+  - setup: |
+      cd feed2imap
+      cargo check
+  - build: |
+      cd feed2imap
+      cargo build
