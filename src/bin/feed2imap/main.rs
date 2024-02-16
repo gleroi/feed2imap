@@ -1,9 +1,10 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::Error;
 use clap::{Args, Parser, Subcommand};
 use feed2imap::{fetch, imap, transform};
-use futures::future::join_all;
+use futures::future::try_join_all;
+use tokio::sync::Mutex;
 
 pub mod config;
 
@@ -61,34 +62,63 @@ async fn config(_cli: &Cli) -> Result<(), Error> {
 }
 
 async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
-    let config = config::load(&cli.config)?;
+    let config = Arc::new(config::load(&cli.config)?);
     log::debug!("connecting to mail server");
-    let mut imap_client = imap::client(&config.imap.username, &config.imap.password).await?;
+    let imap_client = Arc::new(Mutex::new(
+        imap::client(&config.imap.username, &config.imap.password).await?,
+    ));
+
     log::debug!("get email ids");
-    let ids = imap_client.list_message_ids("feeds").await?;
+    let ids = {
+        let mut imap_guard = imap_client.lock().await;
+        Arc::new(imap_guard.list_message_ids("feeds").await?)
+    };
+
     log::debug!("{} emails found", ids.len());
 
-    for feed in &config.feeds {
-        log::info!("syncing {}", feed.url);
-        let full_feed = fetch::url(&feed.url).await?;
-        for entry in &full_feed.entries {
-            let id = transform::extract_message_id(&full_feed, &entry);
-            if !ids.contains(&id) {
-                let mail = transform::extract_message(
-                    &config.imap.name,
-                    &config.imap.email,
-                    &full_feed,
-                    entry,
-                )?;
-                imap_client.append(&mail, "feeds").await?;
-                log::debug!("{} appended to mail", id);
-            } else {
-                log::debug!("{} already in mail", id);
-            }
-        }
-    }
-
+    let futures: Vec<_> = config
+        .feeds
+        .iter()
+        .map(|feed| {
+            let inner_ids = ids.clone();
+            let url = feed.url.clone();
+            let inner_config = config.clone();
+            let inner_imap = imap_client.clone();
+            tokio::spawn(async {
+                sync_feed(url, inner_ids, inner_config, inner_imap).await?;
+                Ok::<(), Error>(())
+            })
+        })
+        .collect();
+    let _results = try_join_all(futures).await?;
     Ok(())
+}
+
+async fn sync_feed(
+    url: String,
+    ids: Arc<BTreeSet<String>>,
+    config: Arc<config::Config>,
+    imap_lock: Arc<Mutex<imap::Client>>,
+) -> Result<(), Error> {
+    log::info!("syncing {}", url);
+    let full_feed = fetch::url(&url).await?;
+    Ok(for entry in &full_feed.entries {
+        let id = transform::extract_message_id(&full_feed, &entry);
+        if !ids.contains(&id) {
+            let mail = transform::extract_message(
+                &config.imap.name,
+                &config.imap.email,
+                &full_feed,
+                entry,
+            )?;
+            log::debug!("{}: {} appending to mail", url, id);
+            let mut imap_client = imap_lock.lock().await;
+            imap_client.append(&mail, "feeds").await?;
+            log::debug!("{}: {} appended to mail", url, id);
+        } else {
+            log::debug!("{}: {} already in mail", url, id);
+        }
+    })
 }
 
 async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
