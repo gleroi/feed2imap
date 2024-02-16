@@ -1,6 +1,6 @@
 use std::{collections::BTreeSet, sync::Arc};
 
-use anyhow::Error;
+use anyhow::{anyhow, Error};
 use clap::{Args, Parser, Subcommand};
 use feed2imap::{fetch, imap, transform};
 use futures::future::try_join_all;
@@ -123,6 +123,10 @@ async fn sync_feed(
 
 async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
     let mut config = config::load(&cli.config)?;
+
+    if config.feeds.iter().any(|feed| feed.url == args.url) {
+        return Err(anyhow!("{} already in config", args.url));
+    }
 
     log::info!("fetch {}", args.url);
 
