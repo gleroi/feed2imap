@@ -4,6 +4,7 @@ use anyhow::{anyhow, Error};
 use clap::{Args, Parser, Subcommand};
 use feed2imap::{fetch, imap, transform};
 use futures::future::try_join_all;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::Mutex;
 
 pub mod config;
@@ -76,6 +77,11 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
 
     log::debug!("{} emails found", ids.len());
 
+    let multi_bar = MultiProgress::new();
+    let style = ProgressStyle::default_bar()
+        .progress_chars("##-")
+        .template("[{prefix:20}] {wide_bar} [{pos:>4} / {len:4}]")?;
+
     let futures: Vec<_> = config
         .feeds
         .iter()
@@ -84,8 +90,10 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
             let url = feed.url.clone();
             let inner_config = config.clone();
             let inner_imap = imap_client.clone();
+            let pb = multi_bar.add(ProgressBar::new(0));
+            pb.set_style(style.clone());
             tokio::spawn(async {
-                sync_feed(url, inner_ids, inner_config, inner_imap).await?;
+                sync_feed(url, inner_ids, inner_config, inner_imap, pb).await?;
                 Ok::<(), Error>(())
             })
         })
@@ -99,10 +107,19 @@ async fn sync_feed(
     ids: Arc<BTreeSet<String>>,
     config: Arc<config::Config>,
     imap_lock: Arc<Mutex<imap::Client>>,
+    pb: ProgressBar,
 ) -> Result<(), Error> {
     log::info!("syncing {}", url);
     let full_feed = fetch::url(&url).await?;
-    Ok(for entry in &full_feed.entries {
+
+    let title: String = transform::extract_feed_title(&full_feed)?
+        .chars()
+        .take(20)
+        .collect();
+    pb.set_prefix(title);
+    pb.set_length(full_feed.entries.len() as u64);
+
+    for entry in &full_feed.entries {
         let id = transform::extract_message_id(&full_feed, &entry);
         if !ids.contains(&id) {
             let mail = transform::extract_message(
@@ -118,7 +135,10 @@ async fn sync_feed(
         } else {
             log::debug!("{}: {} already in mail", url, id);
         }
-    })
+        pb.inc(1);
+    }
+    pb.finish();
+    Ok(())
 }
 
 async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {

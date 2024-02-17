@@ -6,7 +6,7 @@ use mail_builder::{
     mime::MimePart,
     MessageBuilder,
 };
-use std::{fmt::Display, io::Write};
+use std::fmt::Display;
 
 mod html;
 
@@ -45,7 +45,7 @@ pub fn extract_message_id(feed: &feed_rs::model::Feed, entry: &feed_rs::model::E
     return format!("{}", hash);
 }
 
-fn extract_feed_title(full_feed: &feed_rs::model::Feed) -> Result<String, Error> {
+pub fn extract_feed_title(full_feed: &feed_rs::model::Feed) -> Result<String, Error> {
     Ok(full_feed.title.clone().unwrap_or(unknown_text()).content)
 }
 
