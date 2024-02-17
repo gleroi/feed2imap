@@ -2,6 +2,7 @@ use std::{collections::BTreeSet, sync::Arc};
 
 use anyhow::{anyhow, Error};
 use clap::{Args, Parser, Subcommand};
+use directories::BaseDirs;
 use feed2imap::{fetch, imap, transform};
 use futures::future::try_join_all;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -12,12 +13,25 @@ pub mod config;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    /// path to configuration file
+    /// path to configuration file, default to ~/.config/feed2imap.toml
     #[arg(long, env = "FEED2IMAP_CONFIG")]
-    config: String,
+    config: Option<String>,
 
     #[command(subcommand)]
     command: Command,
+}
+
+impl Cli {
+    fn config_path(&self) -> String {
+        if let Some(ref config_path) = self.config {
+            return config_path.clone();
+        } else {
+            let dirs = BaseDirs::new().unwrap();
+            let config_dir = dirs.config_dir();
+            let config_path = config_dir.join("feed2imap.toml");
+            return config_path.to_string_lossy().into_owned();
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -63,7 +77,7 @@ async fn config(_cli: &Cli) -> Result<(), Error> {
 }
 
 async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
-    let config = Arc::new(config::load(&cli.config)?);
+    let config = Arc::new(config::load(&cli.config_path())?);
     log::debug!("connecting to mail server");
     let imap_client = Arc::new(Mutex::new(
         imap::client(&config.imap.username, &config.imap.password).await?,
@@ -142,7 +156,7 @@ async fn sync_feed(
 }
 
 async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
-    let mut config = config::load(&cli.config)?;
+    let mut config = config::load(&cli.config_path())?;
 
     if config.feeds.iter().any(|feed| feed.url == args.url) {
         return Err(anyhow!("{} already in config", args.url));
@@ -155,13 +169,13 @@ async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
     config.feeds.push(config::Feed {
         url: args.url.to_owned(),
     });
-    config::save(&config, &cli.config)?;
+    config::save(&config, &cli.config_path())?;
 
     Ok(())
 }
 
 async fn list_feeds(cli: &Cli) -> Result<(), Error> {
-    let config = config::load(&cli.config)?;
+    let config = config::load(&cli.config_path())?;
     for feed in config.feeds {
         println!("Url: {}", feed.url);
     }

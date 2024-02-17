@@ -1,10 +1,11 @@
 use std::{
+    fmt::Display,
     fs::File,
     io::{Read, Write},
     path::Path,
 };
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default)]
@@ -28,8 +29,8 @@ pub struct Feed {
     pub url: String,
 }
 
-pub fn load<P: AsRef<Path>>(path: P) -> Result<Config, Error> {
-    let mut file = File::open(path)?;
+pub fn load<P: AsRef<Path> + Display>(path: P) -> Result<Config, Error> {
+    let mut file = File::open(&path).with_context(|| format!("failed opening {}", &path))?;
     let mut content = String::new();
     file.read_to_string(&mut content)?;
     let config = toml::from_str(&content)?;
