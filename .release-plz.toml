@@ -3,6 +3,8 @@ changelog_update = true
 git_release_enable = true
 pr_labels = ["release"]
 publish = false
+semver_check = false
+dependencies_update = false
 
 [changelog]
 header = """# CHANGELOG
