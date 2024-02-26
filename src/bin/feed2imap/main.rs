@@ -1,10 +1,13 @@
-use std::{collections::BTreeSet, sync::Arc};
+use std::{
+    collections::{HashMap},
+    sync::Arc,
+};
 
 use anyhow::{anyhow, Error};
 use clap::{Args, Parser, Subcommand};
 use directories::BaseDirs;
-use feed2imap::{fetch, imap, transform};
-use futures::future::try_join_all;
+use feed2imap::{fetch, imap, sync};
+
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::Mutex;
 
@@ -76,82 +79,64 @@ async fn config(_cli: &Cli) -> Result<(), Error> {
     config::dump_default()
 }
 
+#[derive(Clone)]
+struct CliReporter {
+    mb: MultiProgress,
+    style: ProgressStyle,
+    index: Arc<Mutex<HashMap<String, ProgressBar>>>,
+}
+
+impl CliReporter {
+    fn new() -> Result<CliReporter, Error> {
+        Ok(CliReporter {
+            mb: MultiProgress::new(),
+            style: ProgressStyle::default_bar()
+                .progress_chars("##-")
+                .template("[{prefix:20}] {wide_bar} [{pos:>4} / {len:4}]")?,
+            index: Arc::new(Mutex::new(HashMap::new())),
+        })
+    }
+    async fn add(&self, url: &str) {
+        let pb = ProgressBar::new(0);
+        pb.set_style(self.style.clone());
+        let pb2 = self.mb.add(pb);
+        let mut index = self.index.lock().await;
+        index.insert(url.to_string(), pb2);
+    }
+}
+
+impl sync::Reporter for CliReporter {
+    async fn on_feed(&self, feed: &str) {
+        self.add(feed).await;
+    }
+
+    async fn on_entries_count(&self, feed: &str, title: &str, count: u64) {
+        let index = self.index.lock().await;
+        if let Some(pb) = index.get(feed) {
+            pb.set_prefix(title.to_owned());
+            pb.set_length(count);
+        }
+    }
+
+    async fn on_entry(&self, feed: &str) {
+        let index = self.index.lock().await;
+        if let Some(pb) = index.get(feed) {
+            pb.inc(1)
+        }
+    }
+}
+
 async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     let config = Arc::new(config::load(&cli.config_path())?);
     log::debug!("connecting to mail server");
-    let imap_client = Arc::new(Mutex::new(
-        imap::client(&config.imap.username, &config.imap.password).await?,
-    ));
+    let client = imap::client(&config.imap.username, &config.imap.password).await?;
+    let output = imap::new_output(client, "feeds").await?;
+    let syncer = sync::Syncer::new(&config.imap.name, &config.imap.email);
+    let reporter = CliReporter::new()?;
 
-    log::debug!("get email ids");
-    let ids = {
-        let mut imap_guard = imap_client.lock().await;
-        Arc::new(imap_guard.list_message_ids("feeds").await?)
-    };
+    let urls = config.feeds.iter().map(|f| f.url.to_owned()).collect();
+    syncer.sync(&urls, output, reporter).await?;
 
-    log::debug!("{} emails found", ids.len());
-
-    let multi_bar = MultiProgress::new();
-    let style = ProgressStyle::default_bar()
-        .progress_chars("##-")
-        .template("[{prefix:20}] {wide_bar} [{pos:>4} / {len:4}]")?;
-
-    let futures: Vec<_> = config
-        .feeds
-        .iter()
-        .map(|feed| {
-            let inner_ids = ids.clone();
-            let url = feed.url.clone();
-            let inner_config = config.clone();
-            let inner_imap = imap_client.clone();
-            let pb = multi_bar.add(ProgressBar::new(0));
-            pb.set_style(style.clone());
-            tokio::spawn(async {
-                sync_feed(url, inner_ids, inner_config, inner_imap, pb).await?;
-                Ok::<(), Error>(())
-            })
-        })
-        .collect();
-    let _results = try_join_all(futures).await?;
-    Ok(())
-}
-
-async fn sync_feed(
-    url: String,
-    ids: Arc<BTreeSet<String>>,
-    config: Arc<config::Config>,
-    imap_lock: Arc<Mutex<imap::Client>>,
-    pb: ProgressBar,
-) -> Result<(), Error> {
-    log::info!("syncing {}", url);
-    let full_feed = fetch::url(&url).await?;
-
-    let title: String = transform::extract_feed_title(&full_feed)?
-        .chars()
-        .take(20)
-        .collect();
-    pb.set_prefix(title);
-    pb.set_length(full_feed.entries.len() as u64);
-
-    for entry in &full_feed.entries {
-        let id = transform::extract_message_id(&full_feed, &entry);
-        if !ids.contains(&id) {
-            let mail = transform::extract_message(
-                &config.imap.name,
-                &config.imap.email,
-                &full_feed,
-                entry,
-            )?;
-            log::debug!("{}: {} appending to mail", url, id);
-            let mut imap_client = imap_lock.lock().await;
-            imap_client.append(&mail, "feeds").await?;
-            log::debug!("{}: {} appended to mail", url, id);
-        } else {
-            log::debug!("{}: {} already in mail", url, id);
-        }
-        pb.inc(1);
-    }
-    pb.finish();
     Ok(())
 }
 
