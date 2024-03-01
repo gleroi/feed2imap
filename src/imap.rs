@@ -3,8 +3,10 @@ use async_imap::types::Fetch;
 use async_native_tls::TlsStream;
 use futures::StreamExt;
 use mail_parser;
-use std::collections::BTreeSet;
-use tokio::net::TcpStream;
+use std::{collections::BTreeSet, sync::Arc};
+use tokio::{net::TcpStream, sync::Mutex};
+
+use crate::sync;
 
 pub struct Client {
     imap: async_imap::Session<TlsStream<TcpStream>>,
@@ -60,5 +62,33 @@ impl Client {
             })
             .collect();
         Ok(ids)
+    }
+}
+
+pub struct InnerOutput {
+    client: Mutex<Client>,
+    ids: BTreeSet<String>,
+    folder: String,
+}
+
+pub type Output = Arc<InnerOutput>;
+
+pub async fn new_output(mut client: Client, folder: &str) -> Result<Output, Error> {
+    let ids = client.list_message_ids(&folder).await?;
+    Ok(Arc::new(InnerOutput {
+        client: Mutex::new(client),
+        ids,
+        folder: folder.to_string(),
+    }))
+}
+
+impl sync::Output for Output {
+    fn contains(&self, id: &str) -> bool {
+        return self.ids.contains(id);
+    }
+
+    async fn append(&self, mail: &Vec<u8>) -> Result<(), Error> {
+        let mut imap_client = self.client.lock().await;
+        Ok(imap_client.append(mail, &self.folder).await?)
     }
 }
