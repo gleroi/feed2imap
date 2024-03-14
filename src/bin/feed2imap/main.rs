@@ -64,11 +64,18 @@ async fn main() -> () {
     pretty_env_logger::init();
     let cli = Cli::parse();
 
-    match &cli.command {
-        Command::Add(ref args) => add_feed(&cli, args).await.unwrap(),
-        Command::Config => config(&cli).await.unwrap(),
-        Command::List => list_feeds(&cli).await.unwrap(),
-        Command::Sync => sync_feeds(&cli).await.unwrap(),
+    let result = match &cli.command {
+        Command::Add(ref args) => add_feed(&cli, args).await,
+        Command::Config => config(&cli).await,
+        Command::List => list_feeds(&cli).await,
+        Command::Sync => sync_feeds(&cli).await,
+    };
+    if let Err(err) = result {
+        eprintln!("ERROR: {}", err);
+        err.chain()
+            .skip(1)
+            .for_each(|cause| eprintln!("because: {}", cause));
+        std::process::exit(1);
     }
 }
 
