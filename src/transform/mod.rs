@@ -1,6 +1,6 @@
 use anyhow::Error;
 use chrono::Utc;
-use feed_rs::model::Text;
+use feed_rs::model::{Person, Text};
 use mail_builder::{
     headers::{address::Address, date::Date},
     mime::MimePart,
@@ -20,7 +20,7 @@ pub fn extract_message(
         .message_id(extract_message_id(full_feed, entry))
         .from(Address::new_address(
             extract_feed_title(full_feed)?.into(),
-            extract_email(full_feed)?,
+            extract_email(full_feed, entry)?,
         ))
         .to(Address::new_address(name.into(), email))
         .date(extract_published_date(entry))
@@ -49,11 +49,20 @@ pub fn extract_feed_title(full_feed: &feed_rs::model::Feed) -> Result<String, Er
     Ok(full_feed.title.clone().unwrap_or(unknown_text()).content)
 }
 
-pub fn extract_email(feed: &feed_rs::model::Feed) -> Result<String, Error> {
-    if let Some(ref author) = feed.authors.iter().find(|author| author.email.is_some()) {
-        Ok(author.email.as_ref().unwrap().to_owned())
+pub fn extract_email(
+    feed: &feed_rs::model::Feed,
+    entry: &feed_rs::model::Entry,
+) -> Result<String, Error> {
+    Ok(extract_authors(&feed.authors).unwrap_or_else(|| {
+        extract_authors(&entry.authors).unwrap_or_else(|| "placeholder@example.com".to_string())
+    }))
+}
+
+fn extract_authors(authors: &Vec<Person>) -> Option<String> {
+    if let Some(ref author) = authors.iter().find(|author| author.email.is_some()) {
+        Some(author.email.as_ref().unwrap().to_owned())
     } else {
-        Ok("placeholder@example.org".to_string())
+        None
     }
 }
 

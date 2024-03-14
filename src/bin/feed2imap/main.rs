@@ -1,12 +1,9 @@
-use std::{
-    collections::{HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{anyhow, Error};
 use clap::{Args, Parser, Subcommand};
 use directories::BaseDirs;
-use feed2imap::{fetch, imap, sync};
+use feed2imap::{fetch, imap, sync, transform};
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use tokio::sync::Mutex;
@@ -143,13 +140,17 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
 async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
     let mut config = config::load(&cli.config_path())?;
 
+    log::info!("fetch {}", args.url);
+
+    let feed = fetch::url(&args.url).await?;
+    let title = transform::extract_feed_title(&feed)?;
+    let email = transform::extract_email(&feed, feed.entries.first().expect("no entries in feed"))?;
+
+    println!("Title: {}\nEmail: {}\nUrl: {}", title, email, args.url);
+
     if config.feeds.iter().any(|feed| feed.url == args.url) {
         return Err(anyhow!("{} already in config", args.url));
     }
-
-    log::info!("fetch {}", args.url);
-
-    let _feed = fetch::url(&args.url).await?;
 
     config.feeds.push(config::Feed {
         url: args.url.to_owned(),
