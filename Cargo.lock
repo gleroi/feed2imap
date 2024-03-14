@@ -543,7 +543,7 @@ checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
 [[package]]
 name = "feed-rs"
 version = "1.4.0"
-source = "git+https://github.com/gleroi/feed-rs.git?branch=feature/handle_atom_entry_xml_base_attribute#4c46d6173b9613aa0255fddd54429c1f0d646c17"
+source = "git+https://github.com/gleroi/feed-rs.git?branch=master#bd1e06e86e02b0f0b57d3f3063d53e3c27be52c3"
 dependencies = [
  "chrono",
  "lazy_static",

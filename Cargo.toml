@@ -35,7 +35,7 @@ tokio = { version = "1.35.1", features = ["full"] }
 toml = "0.8.8"
 
 [patch.crates-io]
-feed-rs = { git = "https://github.com/gleroi/feed-rs.git", branch = "feature/handle_atom_entry_xml_base_attribute" }
+feed-rs = { git = "https://github.com/gleroi/feed-rs.git", branch = "master" }
 
 # The profile that 'cargo dist' will build with
 [profile.dist]
