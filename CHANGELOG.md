@@ -2,11 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.1.1] - 2024-03-10
 
 ### 🚀 Features
 
 - *(sync)* Modularize synchronization
+- *(ci)* Remove aarch64 build
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -14,6 +15,10 @@ All notable changes to this project will be documented in this file.
 - Enable aarch64 linux build
 - Disable semver check while feed-rs is from git
 - *(release)* Remove release-plz, use cliff
+
+### Release
+
+- 0.1.1
 
 ## [0.1.0] - 2024-02-24
 
