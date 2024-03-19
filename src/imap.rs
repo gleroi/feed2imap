@@ -87,8 +87,10 @@ impl sync::Output for Output {
         return self.ids.contains(id);
     }
 
-    async fn append(&self, mail: &Vec<u8>) -> Result<(), Error> {
+    async fn append(&self, mail: &Vec<u8>, folder: Option<&str>) -> Result<(), Error> {
         let mut imap_client = self.client.lock().await;
-        Ok(imap_client.append(mail, &self.folder).await?)
+        Ok(imap_client
+            .append(mail, folder.unwrap_or(&self.folder))
+            .await?)
     }
 }

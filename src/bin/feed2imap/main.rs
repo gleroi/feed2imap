@@ -134,12 +134,11 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     let config = Arc::new(config::load(&cli.config_path())?);
     log::debug!("connecting to mail server");
     let client = imap::client(&config.imap.username, &config.imap.password).await?;
-    let output = imap::new_output(client, "feeds").await?;
+    let output = imap::new_output(client, &config.imap.default_folder).await?;
     let syncer = sync::Syncer::new(&config.imap.name, &config.imap.email);
     let reporter = CliReporter::new()?;
 
-    let urls = config.feeds.iter().map(|f| f.url.to_owned()).collect();
-    syncer.sync(&urls, output, reporter).await?;
+    syncer.sync(&config.feeds, output, reporter).await?;
 
     Ok(())
 }

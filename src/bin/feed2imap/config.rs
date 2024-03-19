@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Error};
+use feed2imap::sync::Input;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Default)]
@@ -22,11 +23,18 @@ pub struct Imap {
     pub password: String,
     pub name: String,
     pub email: String,
+    pub default_folder: String,
 }
 
-#[derive(Deserialize, Serialize, Default)]
+#[derive(Deserialize, Serialize, Default, Clone)]
 pub struct Feed {
     pub url: String,
+}
+
+impl Input for Feed {
+    fn url(&self) -> &str {
+        &self.url
+    }
 }
 
 pub fn load<P: AsRef<Path> + Display>(path: P) -> Result<Config, Error> {

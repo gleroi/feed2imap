@@ -15,6 +15,7 @@ pub trait Output {
     fn append(
         &self,
         mail: &Vec<u8>,
+        folder: Option<&str>,
     ) -> impl std::future::Future<Output = Result<(), Error>> + std::marker::Send;
 }
 
@@ -29,6 +30,10 @@ pub trait Reporter {
     fn on_entry(&self, feed: &str) -> impl std::future::Future<Output = ()> + Send;
 }
 
+pub trait Input {
+    fn url(&self) -> &str;
+}
+
 impl Syncer {
     pub fn new(name: &String, email: &String) -> Arc<Syncer> {
         Arc::new(Syncer {
@@ -37,15 +42,16 @@ impl Syncer {
         })
     }
 
-    pub async fn sync<TOutput, TReporter>(
+    pub async fn sync<TOutput, TReporter, TInput>(
         self: Arc<Self>,
-        inputs: &Vec<String>,
+        inputs: &Vec<TInput>,
         output: TOutput,
         reporter: TReporter,
     ) -> Result<(), Error>
     where
         TOutput: Output + Sync + Send + Clone + 'static,
         TReporter: Reporter + Send + Clone + 'static,
+        TInput: Input + Send + Clone + 'static,
     {
         let mut tasks = Vec::with_capacity(inputs.len());
         for input in inputs {
@@ -65,16 +71,18 @@ impl Syncer {
         Ok(())
     }
 
-    async fn sync_feed<TOutput, TReporter>(
+    async fn sync_feed<TOutput, TReporter, TInput>(
         self: Arc<Self>,
-        url: String,
+        input: TInput,
         output: TOutput,
         reporter: TReporter,
     ) -> Result<(), Error>
     where
         TOutput: Output,
         TReporter: Reporter,
+        TInput: Input,
     {
+        let url = input.url();
         log::info!("syncing {}", url);
         reporter.on_feed(&url).await;
         let full_feed = fetch::url(&url).await?;
@@ -90,7 +98,7 @@ impl Syncer {
             if !output.contains(&id) {
                 let mail = transform::extract_message(&self.name, &self.email, &full_feed, entry)?;
                 log::debug!("{}: {} appending to mail", url, id);
-                output.append(&mail).await?;
+                output.append(&mail, None).await?;
                 log::debug!("{}: {} appended to mail", url, id);
             } else {
                 log::debug!("{}: {} already in mail", url, id);
