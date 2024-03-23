@@ -169,7 +169,13 @@ async fn add_feed(cli: &Cli, args: &AddArgs) -> Result<(), Error> {
 async fn list_feeds(cli: &Cli) -> Result<(), Error> {
     let config = config::load(&cli.config_path())?;
     for feed in config.feeds {
-        println!("Url: {}", feed.url);
+        let full_feed = fetch::url(&feed.url).await?;
+        let title = transform::extract_feed_title(&full_feed)?;
+        let email = transform::extract_email(
+            &full_feed,
+            full_feed.entries.first().expect("no entries in feed"),
+        )?;
+        println!("Title: {}\nEmail: {}\nUrl: {}\n", title, email, feed.url);
     }
     Ok(())
 }
