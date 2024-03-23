@@ -1,11 +1,12 @@
 use anyhow::Error;
 use chrono::Utc;
-use feed_rs::model::{Person, Text};
+use feed_rs::model::{Link, Person, Text};
 use mail_builder::{
     headers::{address::Address, date::Date},
     mime::MimePart,
     MessageBuilder,
 };
+use reqwest::Url;
 use std::fmt::Display;
 
 mod html;
@@ -54,7 +55,18 @@ pub fn extract_email(
     entry: &feed_rs::model::Entry,
 ) -> Result<String, Error> {
     Ok(extract_authors(&feed.authors).unwrap_or_else(|| {
-        extract_authors(&entry.authors).unwrap_or_else(|| "placeholder@example.com".to_string())
+        extract_authors(&entry.authors).unwrap_or_else(|| {
+            feed.links
+                .first()
+                .and_then(|l| {
+                    let host = Url::parse(&l.href)
+                        .ok()
+                        .and_then(|url| url.host_str())
+                        .unwrap_or("example.com");
+                    Some(format!("rss@{}", host))
+                })
+                .unwrap_or_else(|| "placeholder@example.com".to_string())
+        })
     }))
 }
 
@@ -75,7 +87,8 @@ pub fn extract_content(entry: &feed_rs::model::Entry) -> Result<MimePart, Error>
     if let Some(ref base_url) = entry.base {
         content = html::rewrite_relative_link(base_url, content)?;
     }
-    content = wrap_content(content);
+    let link = extract_article_link(entry)?;
+    content = wrap_content(content, link);
     // {
     //     let mut hasher = blake3::Hasher::new();
     //     hasher.update(&entry.id.as_bytes());
@@ -88,26 +101,48 @@ pub fn extract_content(entry: &feed_rs::model::Entry) -> Result<MimePart, Error>
     return Ok(MimePart::new("text/html", content));
 }
 
-fn wrap_content(content: String) -> String {
+pub fn extract_article_link(entry: &feed_rs::model::Entry) -> Result<Option<Link>, Error> {
+    Ok(entry.links.first().and_then(|l| Some(l.to_owned())))
+}
+
+fn wrap_content(content: String, article_link: Option<Link>) -> String {
     let style = include_str!("../assets/message.css");
+    let link_href = article_link
+        .as_ref()
+        .and_then(|l| Some(l.href.to_owned()))
+        .unwrap_or("none".to_owned());
+    let link_title = article_link
+        .as_ref()
+        .and_then(|l| l.title.to_owned())
+        .unwrap_or(link_href.to_owned());
+
     format!(
         r#"
         <html>
             <head>
                 <meta http-equiv="Content-Type" content="text/html">
                 <style>
-                    {}
+                    {style}
                 </style>
             </head>
     
             <body>
                 <div id="entry">
-                    {}
+                    {content}
+                </div>
+                <div id=links>
+                    <h4>Links</h4>
+                    <ul>
+                        <li><a href="{link_href}">{link_title}</a></li>
+                    <ul>
                 </div>
             </body>
         </html>
         "#,
-        style, content
+        style = style,
+        content = content,
+        link_title = link_title,
+        link_href = link_href
     )
 }
 
