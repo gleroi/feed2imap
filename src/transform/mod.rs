@@ -61,9 +61,8 @@ pub fn extract_email(
                 .and_then(|l| {
                     let host = Url::parse(&l.href)
                         .ok()
-                        .and_then(|url| url.host_str())
-                        .unwrap_or("example.com");
-                    Some(format!("rss@{}", host))
+                        .and_then(|url| Some(url.host_str().unwrap_or("example.com").to_owned()));
+                    Some(format!("rss@{}", host.unwrap_or("example.com".to_owned())))
                 })
                 .unwrap_or_else(|| "placeholder@example.com".to_string())
         })
