@@ -32,8 +32,8 @@ pub fn extract_message(
 
 fn extract_published_date(entry: &feed_rs::model::Entry) -> impl Into<Date> {
     entry
-        .updated
-        .or_else(|| entry.published)
+        .published
+        .or_else(|| entry.updated)
         .unwrap_or_else(|| Utc::now())
         .timestamp()
 }
