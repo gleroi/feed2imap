@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [unreleased]
+
+### 🚀 Features
+
+- *(add)* Print more infos about added feed
+- *(main)* Print a message on error
+- *(sync)* Make output folder configurable
+- *(list)* Print name and email
+- *(fetch)* Better error message
+- *(sync)* Add link and enhance author email
+- *(transform)* Use published data, as updated may be feed generation date
+- *(transform)* Generate a better email when author is missing
+
+### ⚙️ Miscellaneous Tasks
+
+- Update changelog for 0.1.1
+- *(ci)* Update cargo-dist
+- Do not ignore Cargo.lock
+
 ## [0.1.1] - 2024-03-10
 
 ### 🚀 Features
