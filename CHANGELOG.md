@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.2.0] - 2024-03-24
 
 ### 🚀 Features
 
@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Update changelog for 0.1.1
 - *(ci)* Update cargo-dist
 - Do not ignore Cargo.lock
+- Update changelog
 
 ## [0.1.1] - 2024-03-10
 
