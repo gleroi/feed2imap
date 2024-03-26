@@ -20,7 +20,7 @@ pub trait Output {
 }
 
 pub trait Reporter {
-    fn on_feed(&self, feed: &str) -> impl std::future::Future<Output = ()> + std::marker::Send;
+    fn on_begin(&self, feed: &str) -> impl std::future::Future<Output = ()> + std::marker::Send;
     fn on_entries_count(
         &self,
         feed: &str,
@@ -28,6 +28,11 @@ pub trait Reporter {
         count: u64,
     ) -> impl std::future::Future<Output = ()> + std::marker::Send;
     fn on_entry(&self, feed: &str) -> impl std::future::Future<Output = ()> + Send;
+    fn on_end(
+        &self,
+        feed: &str,
+        result: &Result<(), Error>,
+    ) -> impl std::future::Future<Output = ()> + Send + Sync;
 }
 
 pub trait Input {
@@ -50,7 +55,7 @@ impl Syncer {
     ) -> Result<(), Error>
     where
         TOutput: Output + Sync + Send + Clone + 'static,
-        TReporter: Reporter + Send + Clone + 'static,
+        TReporter: Reporter + Send + Clone + std::marker::Sync + 'static,
         TInput: Input + Send + Clone + 'static,
     {
         let mut tasks = Vec::with_capacity(inputs.len());
@@ -79,12 +84,12 @@ impl Syncer {
     ) -> Result<(), Error>
     where
         TOutput: Output,
-        TReporter: Reporter,
+        TReporter: Reporter + std::marker::Sync,
         TInput: Input,
     {
         let url = input.url();
         log::info!("syncing {}", url);
-        reporter.on_feed(&url).await;
+        reporter.on_begin(&url).await;
         let full_feed = fetch::url(&url).await?;
         let title: String = transform::extract_feed_title(&full_feed)?
             .chars()
@@ -93,7 +98,25 @@ impl Syncer {
         reporter
             .on_entries_count(&url, &title, full_feed.entries.len() as u64)
             .await;
-        for entry in &full_feed.entries {
+        let result = self
+            .sync_feed_entries(full_feed, output, url, &reporter)
+            .await;
+        reporter.on_end(url, &result).await;
+        return result;
+    }
+
+    async fn sync_feed_entries<TOutput, TReporter>(
+        self: Arc<Self>,
+        full_feed: feed_rs::model::Feed,
+        output: TOutput,
+        url: &str,
+        reporter: &TReporter,
+    ) -> Result<(), Error>
+    where
+        TOutput: Output,
+        TReporter: Reporter + std::marker::Sync,
+    {
+        let result = for entry in &full_feed.entries {
             let id = transform::extract_message_id(&full_feed, &entry);
             if !output.contains(&id) {
                 let mail = transform::extract_message(&self.name, &self.email, &full_feed, entry)?;
@@ -104,7 +127,7 @@ impl Syncer {
                 log::debug!("{}: {} already in mail", url, id);
             }
             reporter.on_entry(&url).await;
-        }
-        Ok(())
+        };
+        Ok(result)
     }
 }

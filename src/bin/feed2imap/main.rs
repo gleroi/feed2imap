@@ -1,14 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
-
 use anyhow::{anyhow, Error};
 use clap::{Args, Parser, Subcommand};
 use directories::BaseDirs;
 use feed2imap::{fetch, imap, sync, transform};
+use std::sync::Arc;
 
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use tokio::sync::Mutex;
+use crate::reporter::CliReporter;
 
 pub mod config;
+pub mod reporter;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -81,53 +80,6 @@ async fn main() -> () {
 
 async fn config(_cli: &Cli) -> Result<(), Error> {
     config::dump_default()
-}
-
-#[derive(Clone)]
-struct CliReporter {
-    mb: MultiProgress,
-    style: ProgressStyle,
-    index: Arc<Mutex<HashMap<String, ProgressBar>>>,
-}
-
-impl CliReporter {
-    fn new() -> Result<CliReporter, Error> {
-        Ok(CliReporter {
-            mb: MultiProgress::new(),
-            style: ProgressStyle::default_bar()
-                .progress_chars("##-")
-                .template("[{prefix:20}] {wide_bar} [{pos:>4} / {len:4}]")?,
-            index: Arc::new(Mutex::new(HashMap::new())),
-        })
-    }
-    async fn add(&self, url: &str) {
-        let pb = ProgressBar::new(0);
-        pb.set_style(self.style.clone());
-        let pb2 = self.mb.add(pb);
-        let mut index = self.index.lock().await;
-        index.insert(url.to_string(), pb2);
-    }
-}
-
-impl sync::Reporter for CliReporter {
-    async fn on_feed(&self, feed: &str) {
-        self.add(feed).await;
-    }
-
-    async fn on_entries_count(&self, feed: &str, title: &str, count: u64) {
-        let index = self.index.lock().await;
-        if let Some(pb) = index.get(feed) {
-            pb.set_prefix(title.to_owned());
-            pb.set_length(count);
-        }
-    }
-
-    async fn on_entry(&self, feed: &str) {
-        let index = self.index.lock().await;
-        if let Some(pb) = index.get(feed) {
-            pb.inc(1)
-        }
-    }
 }
 
 async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
