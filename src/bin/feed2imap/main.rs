@@ -4,7 +4,7 @@ use directories::BaseDirs;
 use feed2imap::{fetch, imap, sync, transform};
 use std::sync::Arc;
 
-use crate::reporter::CliReporter;
+use crate::reporter::{CliReporter, SimpleReporter};
 
 pub mod config;
 pub mod reporter;
@@ -15,6 +15,10 @@ struct Cli {
     /// path to configuration file, default to ~/.config/feed2imap.toml
     #[arg(long, env = "FEED2IMAP_CONFIG")]
     config: Option<String>,
+
+    /// enable batch mode, i.e simple logging to stdout
+    #[arg(long, default_value_t = false)]
+    batch: bool,
 
     #[command(subcommand)]
     command: Command,
@@ -88,9 +92,13 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     let client = imap::client(&config.imap.username, &config.imap.password).await?;
     let output = imap::new_output(client, &config.imap.default_folder).await?;
     let syncer = sync::Syncer::new(&config.imap.name, &config.imap.email);
-    let reporter = CliReporter::new()?;
-
-    syncer.sync(&config.feeds, output, reporter).await?;
+    if cli.batch {
+        let reporter = SimpleReporter {};
+        syncer.sync(&config.feeds, output, reporter).await?;
+    } else {
+        let reporter = CliReporter::new()?;
+        syncer.sync(&config.feeds, output, reporter).await?;
+    };
 
     Ok(())
 }

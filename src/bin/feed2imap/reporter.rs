@@ -1,5 +1,5 @@
 use anyhow::Error;
-use feed2imap::sync;
+use feed2imap::sync::{self, Reporter};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -57,6 +57,31 @@ impl sync::Reporter for CliReporter {
             if let Err(err) = result {
                 pb.set_message(format!("{}", err));
             }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct SimpleReporter {}
+
+impl Reporter for SimpleReporter {
+    async fn on_begin(&self, feed: &str) {
+        println!("tfetching: {}", feed);
+    }
+
+    async fn on_entries_count(&self, feed: &str, title: &str, count: u64) {
+        println!("fetched: {} ({}) has {} entries", feed, title, count);
+    }
+
+    async fn on_entry(&self, feed: &str) {
+        println!("processed: {} one more !", feed);
+    }
+
+    async fn on_end(&self, feed: &str, result: &Result<(), Error>) {
+        if let Err(err) = result {
+            println!("ERROR: {}: {}", feed, err);
+        } else {
+            println!("synced: {}", feed);
         }
     }
 }
