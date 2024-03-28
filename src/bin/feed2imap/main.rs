@@ -4,7 +4,7 @@ use directories::BaseDirs;
 use feed2imap::{fetch, imap, sync, transform};
 use std::sync::Arc;
 
-use crate::reporter::CliReporter;
+use crate::reporter::{CliReporter, SimpleReporter};
 
 pub mod config;
 pub mod reporter;
@@ -88,7 +88,8 @@ async fn sync_feeds(cli: &Cli) -> Result<(), Error> {
     let client = imap::client(&config.imap.username, &config.imap.password).await?;
     let output = imap::new_output(client, &config.imap.default_folder).await?;
     let syncer = sync::Syncer::new(&config.imap.name, &config.imap.email);
-    let reporter = CliReporter::new()?;
+    // let reporter = CliReporter::new()?;
+    let reporter = SimpleReporter {};
 
     syncer.sync(&config.feeds, output, reporter).await?;
 

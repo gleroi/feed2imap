@@ -88,6 +88,21 @@ impl Syncer {
         TInput: Input,
     {
         let url = input.url();
+        let result = self.sync_feed_entries(output, url, &reporter).await;
+        reporter.on_end(url, &result).await;
+        return result;
+    }
+
+    async fn sync_feed_entries<TOutput, TReporter>(
+        self: Arc<Self>,
+        output: TOutput,
+        url: &str,
+        reporter: &TReporter,
+    ) -> Result<(), Error>
+    where
+        TOutput: Output,
+        TReporter: Reporter + std::marker::Sync,
+    {
         log::info!("syncing {}", url);
         reporter.on_begin(&url).await;
         let full_feed = fetch::url(&url).await?;
@@ -98,24 +113,6 @@ impl Syncer {
         reporter
             .on_entries_count(&url, &title, full_feed.entries.len() as u64)
             .await;
-        let result = self
-            .sync_feed_entries(full_feed, output, url, &reporter)
-            .await;
-        reporter.on_end(url, &result).await;
-        return result;
-    }
-
-    async fn sync_feed_entries<TOutput, TReporter>(
-        self: Arc<Self>,
-        full_feed: feed_rs::model::Feed,
-        output: TOutput,
-        url: &str,
-        reporter: &TReporter,
-    ) -> Result<(), Error>
-    where
-        TOutput: Output,
-        TReporter: Reporter + std::marker::Sync,
-    {
         let result = for entry in &full_feed.entries {
             let id = transform::extract_message_id(&full_feed, &entry);
             if !output.contains(&id) {
