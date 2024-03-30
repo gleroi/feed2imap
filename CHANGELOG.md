@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.0] - 2024-03-24
+## [unreleased]
+
+### 🚀 Features
+
+- *(reporter)* Handle error and move to own module
+- *(reporter)* Add a simple logger
+
+## [0.2.0] - 2024-03-26
 
 ### 🚀 Features
 
@@ -21,6 +28,10 @@ All notable changes to this project will be documented in this file.
 - *(ci)* Update cargo-dist
 - Do not ignore Cargo.lock
 - Update changelog
+
+### Release
+
+- V0.2.0
 
 ## [0.1.1] - 2024-03-10
 

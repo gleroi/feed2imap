@@ -559,7 +559,7 @@ dependencies = [
 
 [[package]]
 name = "feed2imap"
-version = "0.2.0"
+version = "0.2.1-rc.1"
 dependencies = [
  "anyhow",
  "async-imap",
