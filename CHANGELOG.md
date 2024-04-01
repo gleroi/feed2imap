@@ -2,12 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.3.0] - 2024-04-04
 
 ### 🚀 Features
 
 - *(reporter)* Handle error and move to own module
 - *(reporter)* Add a simple logger
+- *(ci)* Use a makefile to build in ci and local
+- *(ci)* Add a new release workflow
 
 ## [0.2.0] - 2024-03-26
 
