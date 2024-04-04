@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2024-04-05
+
+### 🚀 Features
+
+- *(make)* Automate release commit
+
 ## [0.3.0] - 2024-04-04
 
 ### 🚀 Features

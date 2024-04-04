@@ -25,5 +25,12 @@ local-build:
 release-build:
 	cross build --bin feed2imap --profile dist --target $(TARGET)
 
+release-commit:
+	$(if $(value VERSION),, $(error VERSION is not defined))
+	sed -i -r -e 's/^version *= *.*$$/version = "$(VERSION)"/g' Cargo.toml
+	git-cliff --tag $(VERSION) > CHANGELOG.md
+	git commit --all --message "release v$(VERSION)"
+	git tag v$(VERSION)
+
 clean:
 	cargo clean
