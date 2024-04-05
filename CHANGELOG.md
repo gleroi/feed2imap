@@ -2,13 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.1] - 2024-04-05
-
-### 🚀 Features
-
-- *(make)* Automate release commit
-
-## [0.3.0] - 2024-04-04
+## [0.3.0] - 2024-04-05
 
 ### 🚀 Features
 
@@ -16,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - *(reporter)* Add a simple logger
 - *(ci)* Use a makefile to build in ci and local
 - *(ci)* Add a new release workflow
+- *(make)* Automate release commit
 
 ## [0.2.0] - 2024-03-26
 
