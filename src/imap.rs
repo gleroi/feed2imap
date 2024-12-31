@@ -1,12 +1,14 @@
+use crate::sync;
 use anyhow::Error;
 use async_imap::types::Fetch;
-use async_native_tls::TlsStream;
 use futures::StreamExt;
 use mail_parser;
 use std::{collections::BTreeSet, sync::Arc};
 use tokio::{net::TcpStream, sync::Mutex};
-
-use crate::sync;
+use tokio_rustls::rustls::pki_types::ServerName;
+use tokio_rustls::rustls::{ClientConfig, RootCertStore};
+use tokio_rustls::{client::TlsStream, TlsConnector};
+use webpki_roots;
 
 pub struct Client {
     imap: async_imap::Session<TlsStream<TcpStream>>,
@@ -16,8 +18,14 @@ pub async fn client(username: &str, password: &str) -> Result<Client, Error> {
     let imap_server = "mail.infomaniak.com";
     let imap_addr = (imap_server, 993);
     let tcp_stream = TcpStream::connect(imap_addr).await?;
-    let tls = async_native_tls::TlsConnector::new();
-    let tls_stream = tls.connect(imap_server, tcp_stream).await?;
+    let mut root_cert_store = RootCertStore::empty();
+    root_cert_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let config = ClientConfig::builder()
+        .with_root_certificates(root_cert_store)
+        .with_no_client_auth();
+    let tls = TlsConnector::from(Arc::new(config));
+    let server_name = ServerName::try_from(imap_server)?;
+    let tls_stream = tls.connect(server_name, tcp_stream).await?;
     let client = async_imap::Client::new(tls_stream);
     let session = client.login(username, password).await.map_err(|e| e.0)?;
     Ok(Client { imap: session })
