@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2024-12-31
+
+### 🚀 Features
+
+- Use rustls
+
+### ⚙️ Miscellaneous Tasks
+
+- *(cargo)* Update feed-rs and others
+
 ## [0.3.0] - 2024-04-05
 
 ### 🚀 Features
